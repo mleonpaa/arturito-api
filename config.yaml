@@ -1,0 +1,5 @@
+
+name: Example Agent 1
+description: An example agent for demonstration purposes.
+owner: Marcos Leon
+model: gpt-5-mini
