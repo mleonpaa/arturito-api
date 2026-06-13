@@ -1,4 +1,5 @@
 # Initialize command: uvicorn src.arturito-api.app:app
+from contextlib import asynccontextmanager
 import os
 import yaml
 
@@ -19,6 +20,17 @@ REDIS_PARAMS = {
     "password": os.getenv("REDIS_PASSWORD"),
 }
 
+redis = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global redis
+    redis = await create_pool(RedisSettings(**REDIS_PARAMS))
+    
+    yield 
+
+    await redis.close()
+
 class AgentConfig(BaseModel):
     name: str = Field(description="Name of the agent.")
     description: str = Field(description="Description of the agent's purpose and behavior.")
@@ -26,7 +38,9 @@ class AgentConfig(BaseModel):
     model: str = Field(description="LLM to be used by the agent.")
 
 # 1. Initialize the FastAPI app
-app = FastAPI()
+app = FastAPI(
+    lifespan=lifespan
+)
 
 class ChatRequest(BaseModel):
     messages: list
@@ -35,9 +49,6 @@ class ChatRequest(BaseModel):
     stream: Optional[bool] = False
 
 async def create_job(task_name: str, **kwargs):
-    redis = await create_pool(
-        RedisSettings(**REDIS_PARAMS)
-    )
 
     job = await redis.enqueue_job(task_name, **kwargs)
     result = await job.result(timeout=int(os.getenv("ARQ_JOB_TIMEOUT", 30)))
@@ -46,8 +57,9 @@ async def create_job(task_name: str, **kwargs):
 
 @app.post("/agents")
 async def create_agent(config: dict):
-    result = await create_job("create_agent", config=config)
-    return {result}
+    validated_config = AgentConfig(**config)
+    result = await create_job("create_agent", config=validated_config.model_dump())
+    return result
 
 @app.post("/agents/search")
 async def search_agents():

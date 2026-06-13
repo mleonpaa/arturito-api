@@ -6,15 +6,12 @@ def main():
 
     url = "http://localhost:8000/agents"
     
-    with open("/home/mleonpaa/projects/personal/arturito/arturito-api/config.yaml", "r") as f:
+    with open("/workspace/arturito-api/config.yaml", "r") as f:
         config= yaml.safe_load(f)
-
-    payload = {
-        "config": config
-    }
+    
 
     # Use the 'json' parameter to automatically serialize the dict and set proper headers
-    response = requests.post(url, json=payload)
+    response = requests.post(url, json=config)
 
     if response.status_code == 200:
         result = response.json()
